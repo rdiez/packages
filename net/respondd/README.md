@@ -8,7 +8,9 @@ For doing so, respondd spawns a UDP socket (in Gluon 1001/udp), optionally joini
 All information is organized in a non-hierarchical namespace. Each entry identifies a *request name* (e.g. `statistics`, `nodeinfo`, ...) implemented by at least one "provider" C module.
 The respond is the result of merging the outputs of all providers for the given request name.
 
-Some providers are implemented in [/package/gluon-respondd](https://github.com/freifunk-gluon/gluon/tree/master).
+Some providers are implemented in:
+- [gluon-respondd](https://github.com/freifunk-gluon/gluon/tree/master/package/gluon-respondd/)
+- [gluon-node-info](https://github.com/freifunk-gluon/gluon/tree/master/package/gluon-node-info)
 
 ## Usage
 ```
@@ -16,18 +18,24 @@ respondd [-p <port>] [-g <group> -i <if0> [-i <if1> ..]] [-d <dir>]
   -p <int>         port number to listen on
   -g <ip6>         multicast group, e.g. ff02::2:1001
   -i <string>      interface on which the group is joined
+  -t <int>         maximum delay seconds before multicast responses
+                   for the last specified multicast interface (default: 0)
   -d <string>      data provider directory (default: current directory)
   -h               this help
 ```
 
 ## Procotol
-Request and response are encoded as byte strings. These strings are sent as UDP packets. Fragmentation is not supported (except by the IP stack), responses are compressed using the *deflate* algorithm.
+Request and response are encoded as byte strings. These strings are sent as UDP packets. Fragmentation is not supported (except by the IP stack).
 
-- The request is the the word '`GET`' followed by any number of request name, separated by spaces.
-- The response is a compressed JSON document. The top level object will contain a property for each
-  requested name, the rest of the structure is determined by the actual data.
-- (Using just a single request name, without '`GET`', as request will return the data uncompressed
-  and without an enclosing object. This kind of request is deprecated.)
+The request is the word '`GET`' followed by one or more request names like `nodeinfo`, separated by spaces.
+
+The response is a JSON document compressed using the *deflate* algorithm (without a gzip header).
+The top-level object will contain a property for each
+requested name, the rest of the structure is determined by the actual data.
+
+Sending a request with just a single request name, without the '`GET`' prefix, will return the data uncompressed
+and without an enclosing object. This kind of request is actually deprecated, but it is still used
+by the Gluon built-in web interface, and it is also helpful when manually testing respondd.
 
 ### Example
 Requesting `nodeinfo` as implemented in the Gluon modules.
@@ -102,6 +110,16 @@ GET nodeinfo
   }
 }
 ```
+
+### Troubleshooting
+
+Generate a request without compression and print the response:
+
+```printf "nodeinfo" | socat  STDIO  UDP6-DATAGRAM:localhost:1001 && echo```
+
+Capture and print all network packets related to respondd:
+
+```tcpdump -i any -n -A udp port 1001```
 
 ## Implementing modules
 
